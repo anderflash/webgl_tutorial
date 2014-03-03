@@ -167,12 +167,12 @@
 	
 	triangleVertexColorBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexColorBuffer);
-	var colors = [
+	var cores = [
 	    1.0, 0.0, 0.0, 1.0,
 	    0.0, 1.0, 0.0, 1.0,
 	    0.0, 0.0, 1.0, 1.0,
 	];
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cores), gl.STATIC_DRAW);
 	triangleVertexColorBuffer.itemSize = 4;
 	triangleVertexColorBuffer.numItems = 3;
 	
@@ -190,12 +190,12 @@
 	
 	squareVertexColorBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, squareVertexColorBuffer);
-	colors = [];
+	cores = [];
 	for(var i =0; i < 4; i++)
 	{
-	  colors = colors.concat([0.5, 0.5, 1.0, 1.0]);
+	  cores = cores.concat([0.5, 0.5, 1.0, 1.0]);
 	}
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cores), gl.STATIC_DRAW);
 	squareVertexColorBuffer.itemSize = 4;
 	squareVertexColorBuffer.numItems = 4;
       }

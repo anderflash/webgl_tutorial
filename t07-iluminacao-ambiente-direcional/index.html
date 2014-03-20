@@ -8,24 +8,43 @@
       uniform mat4 uMMatrix;
       uniform mat4 uVMatrix;
       uniform mat4 uPMatrix;
+      uniform mat3 uNMatrix;
+      
+      uniform vec3 uCorAmbiente;
+      uniform vec3 uDirecaoLuz;
+      uniform vec3 uCorDifusa;
+      
+      uniform bool uUsarLuz;
       
       varying vec2 vTextureCoord;
+      varying vec3 vPotenciaLuz;
       
       void main(void)
       {
 	gl_Position = uPMatrix * uVMatrix * uMMatrix * vec4(aVertexPosition, 1.0);
 	vTextureCoord = aTextureCoord;
+	
+	if(!uUsarLuz){
+	  vPotenciaLuz = vec3(1.0,1.0,1.0);	  
+	}else
+	{
+	  vec3 normalTransformado=uNMatrix * aVertexNormal;
+	  float potenciaLuz = max(dot(normalTransformado, uDirecaoLuz),0.0);
+	  vPotenciaLuz = uCorAmbiente + uCorDifusa * potenciaLuz;
+	}
       }
     </script>
     <script id="shader-fs" type="x-shader/x-fragment">
       precision mediump float;
       varying vec2 vTextureCoord;
+      varying vec3 vPotenciaLuz;
       
       uniform sampler2D uSampler;
       
       void main(void)
       {
-	gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
+	vec4 corTextura = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));
+	gl_FragColor = vec4(corTextura.rgb * vPotenciaLuz, corTextura.a);
       }
     </script>
     
@@ -41,6 +60,7 @@
       var cuboVertexPositionBuffer;
       var cuboVertexTextureCoordBuffer;
       var cuboVertexIndexBuffer;
+      var cuboVertexNormalBuffer;
       
       var mMatrix = mat4.create();
       var mMatrixPilha = [];
@@ -54,12 +74,15 @@
       
       var z = -5.0;
       
-      var filtro = 0;
-      
       var ultimo = 0;
       
-      var caixaTexturas = Array();
+      var caixaTextura;
       var teclasPressionadas = {};
+      
+      var luzCheckBox;
+      var vermelhoInput;
+      var verdeInput;
+      var azulInput;
     
       // Iniciar o ambiente quando a página for carregada
       $(function()
@@ -94,9 +117,6 @@
       
       function eventoTeclaPress(evento) {
 	teclasPressionadas[evento.keyCode] = true;
-
-	if (String.fromCharCode(evento.keyCode) == "F")
-	  filtro = (filtro+1) % 3;
 	return false;
       }
 
@@ -135,37 +155,22 @@
       function iniciarTextura()
       {
 	var imagemCaixa = new Image();
-	for(var i = 0; i < 3; i++)
-	{
-	  var textura = gl.createTexture();
-	  textura.image = imagemCaixa;
-	  caixaTexturas.push(textura);
-	}
+	var caixaTextura = gl.createTexture();
+	caixaTextura.image = imagemCaixa;
 	imagemCaixa.onload = function()
 	{
-	  tratarTextura(caixaTexturas);
+	  tratarTextura(caixaTextura);
 	}
 	imagemCaixa.src = "caixa.gif";
 	shaderProgram.samplerUniform = gl.getUniformLocation(shaderProgram, "uSampler");
       }
-      function tratarTextura(texturas)
+      function tratarTextura(textura)
       {
 	gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-	gl.bindTexture(gl.TEXTURE_2D, texturas[0]);
-	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texturas[0].image);
+	gl.bindTexture(gl.TEXTURE_2D, textura);
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textura.image);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-
-	gl.bindTexture(gl.TEXTURE_2D, texturas[1]);
-	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texturas[1].image);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-
-	gl.bindTexture(gl.TEXTURE_2D, texturas[2]);
-	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texturas[2].image);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
-	gl.generateMipmap(gl.TEXTURE_2D);
 
 	gl.bindTexture(gl.TEXTURE_2D, null);
       }
@@ -210,9 +215,16 @@
 	shaderProgram.vertexTextureCoordAttribute = gl.getAttribLocation(shaderProgram, "aTextureCoord");
 	gl.enableVertexAttribArray(shaderProgram.vertexTextureCoordAttribute);
 	
+	shaderProgram.vertexNormalAttribute = gl.getAttribLocation(shaderProgram, "aNormal");
+	gl.enableVertexAttribArray(shaderProgram.vertexNormalAttribute);
+	
 	shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
 	shaderProgram.vMatrixUniform = gl.getUniformLocation(shaderProgram, "uVMatrix");
 	shaderProgram.mMatrixUniform = gl.getUniformLocation(shaderProgram, "uMMatrix");
+	shaderProgram.usarLuzUniform = gl.getUniformLocation(shaderProgram, "uUsarLuz");
+	shaderProgram.corAmbienteUniform = gl.getUniformLocation(shaderProgram, "uCorAmbiente");
+	shaderProgram.corDifusaUniform = gl.getUniformLocation(shaderProgram, "uCorDifusa");
+	shaderProgram.direcaoLuzUniform = gl.getUniformLocation(shaderProgram, "uDirecaoLuz");
 	
 	
       }
@@ -361,12 +373,59 @@
 	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 	cuboVertexIndexBuffer.itemSize = 1;
 	cuboVertexIndexBuffer.numItems = 36;
+	
+	cuboVertexNormalBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, cuboVertexNormalBuffer);
+	var vertexNormals = [
+	  // Frente
+	  0.0,  0.0,  1.0,
+	  0.0,  0.0,  1.0,
+	  0.0,  0.0,  1.0,
+	  0.0,  0.0,  1.0,
+
+	  // Trás
+	  0.0,  0.0, -1.0,
+	  0.0,  0.0, -1.0,
+	  0.0,  0.0, -1.0,
+	  0.0,  0.0, -1.0,
+
+	  // Topo
+	  0.0,  1.0,  0.0,
+	  0.0,  1.0,  0.0,
+	  0.0,  1.0,  0.0,
+	  0.0,  1.0,  0.0,
+
+	  // Base
+	  0.0, -1.0,  0.0,
+	  0.0, -1.0,  0.0,
+	  0.0, -1.0,  0.0,
+	  0.0, -1.0,  0.0,
+
+	  // Direita
+	  1.0,  0.0,  0.0,
+	  1.0,  0.0,  0.0,
+	  1.0,  0.0,  0.0,
+	  1.0,  0.0,  0.0,
+
+	  // Esquerda
+	  -1.0,  0.0,  0.0,
+	  -1.0,  0.0,  0.0,
+	  -1.0,  0.0,  0.0,
+	  -1.0,  0.0,  0.0,
+	];
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexNormals),gl.STATIC_DRAW);
+	cubeVertexNormalBuffer.itemSize = 3;
+	cubeVertexNormalBuffer.numItems = 24;
       }
       
       function iniciarAmbiente()
       {
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 	gl.enable(gl.DEPTH_TEST);
+	luzCheckBox = document.getElementById("luz");
+	vermelhoInput = document.getElementById("vermelho");
+	verdeInput = document.getElementById("verde");
+	azulInput = document.getElementById("azul");
       }
       
       function desenharCena()
@@ -386,10 +445,20 @@
 	gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, cuboVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
 	gl.bindBuffer(gl.ARRAY_BUFFER, cuboVertexTextureCoordBuffer);
 	gl.vertexAttribPointer(shaderProgram.vertexTextureCoordAttribute, cuboVertexTextureCoordBuffer.itemSize, gl.FLOAT, false, 0, 0);
+	gl.bindBuffer(gl.ARRAY_BUFFER, cuboVertexNormalBuffer);
+	gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute, cuboVertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);
 	
 	gl.activeTexture(gl.TEXTURE0);
-	gl.bindTexture(gl.TEXTURE_2D, caixaTexturas[filtro]);
+	gl.bindTexture(gl.TEXTURE_2D, caixaTextura);
 	gl.uniform1i(shaderProgram.samplerUniform, 0);
+	
+	var luz = luzCheckBox.checked;
+	gl.uniform1i(shaderProgram.usarLuzUniform, luz);
+	if(luz)
+	{
+	  gl.uniform3f(shaderProgram.corAmbienteUniform,
+	  parseFloat(document.getElement));
+	}
 	
 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cuboVertexIndexBuffer);
 	setMatrixUniforms();
@@ -452,5 +521,9 @@
   
   <body>
     <canvas id="licao01-canvas" width="500" height="500"></canvas>
+    <form>
+      <input type="checkbox" name="luz" value="luz" checked><label for="luz">Luz</label><br>
+      
+    </form>
   </body>
 </html>

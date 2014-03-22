@@ -1,0 +1,299 @@
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <script id="shader-vs" type="x-shader/x-vertex">
+      #define M_PI 3.14159265358979323846
+      attribute vec3 aVertexPosition;
+      attribute vec4 aVertexColor;
+      
+      uniform mat4 uMMatrix;
+      uniform mat4 uVMatrix;
+      uniform mat4 uPMatrix;
+      
+      uniform float uTempo;
+      uniform float uLargura;
+      uniform float uAmplitude;
+      
+      varying vec4 vColor;
+      
+      void main(void)
+      {
+        float primeiraParte = M_PI*2.0/uLargura;
+        gl_Position = uPMatrix * uVMatrix * uMMatrix * vec4(aVertexPosition.x, uAmplitude*sin(primeiraParte*(aVertexPosition.x)+uTempo), aVertexPosition.z, 1.0);
+        vColor = aVertexColor;
+      }
+    </script>
+    <script id="shader-fs" type="x-shader/x-fragment">
+      precision mediump float;
+      varying vec4 vColor;
+      
+      void main(void)
+      {
+        gl_FragColor = vColor;
+      }
+    </script>
+    
+    <!--Funções-->
+    <script type="text/javascript" src="../glMatrix-0.9.5.min.js"></script>
+    <script type="text/javascript" src="../jquery-2.1.0.min.js"></script>
+    <script type="text/javascript" src="../webgl-utils.js"></script>
+    
+    <script type="text/javascript">
+    
+      var gl;
+      var shaderProgram;
+      var bandeiraVertexPositionBuffer;
+      var bandeiraVertexColorBuffer;
+      var bandeiraVertexIndexBuffer;
+      
+      
+      var mMatrix = mat4.create();
+      var mMatrixPilha = [];
+      var pMatrix = mat4.create();
+      var vMatrix = mat4.create();
+      
+      var numX = 100;
+      var numZ = 100;
+      
+      var rBandeira = 0;
+      
+      var ultimo = 0;
+      var tempo = 0;
+      var largura = 0.25;
+      var amplitude = 0.5;
+      var xVelo = 90;
+      var xRot = 0;
+    
+      // Iniciar o ambiente quando a página for carregada
+      $(function()
+      {
+      	iniciaWebGL();
+      });
+      
+      // Iniciar o ambiente
+      function iniciaWebGL()
+      {
+      	var canvas = $('#licao01-canvas')[0];
+      	iniciarGL(canvas); // Definir como um canvas 3D
+      	iniciarShaders();  // Obter e processar os Shaders
+      	iniciarBuffers();  // Enviar o triângulo e quadrado na GPU
+      	iniciarAmbiente(); // Definir background e cor do objeto
+      	tick();
+      }
+      
+      function tick()
+      {
+      	requestAnimFrame(tick);
+      	desenharCena();
+      	animar();
+      }
+      
+      function iniciarGL(canvas)
+      {
+      	try
+      	{
+      	  gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+      	  gl.viewportWidth = canvas.width;
+      	  gl.viewportHeight = canvas.height;
+      	}
+      	catch(e)
+      	{
+      	  if(!gl)
+      	  {
+      	    alert("Não pode inicializar WebGL, desculpe");
+      	  }
+      	}
+      }
+      
+      function iniciarShaders()
+      {
+      	var vertexShader = getShader(gl, "#shader-vs");
+      	var fragmentShader = getShader(gl, "#shader-fs");
+      	
+      	shaderProgram = gl.createProgram();
+      	gl.attachShader(shaderProgram, vertexShader);
+      	gl.attachShader(shaderProgram, fragmentShader);
+      	gl.linkProgram(shaderProgram);
+      	
+      	if(!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS))
+      	{
+      	  alert("Não pode inicializar shaders");
+      	}
+      	
+      	gl.useProgram(shaderProgram);
+      	
+      	shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+      	gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+      	
+      	shaderProgram.vertexColorAttribute = gl.getAttribLocation(shaderProgram, "aVertexColor");
+      	gl.enableVertexAttribArray(shaderProgram.vertexColorAttribute);
+      	
+      	shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
+      	shaderProgram.vMatrixUniform = gl.getUniformLocation(shaderProgram, "uVMatrix");
+      	shaderProgram.mMatrixUniform = gl.getUniformLocation(shaderProgram, "uMMatrix");
+      	shaderProgram.tempoUniform   = gl.getUniformLocation(shaderProgram, "uTempo");
+      	shaderProgram.larguraUniform = gl.getUniformLocation(shaderProgram, "uLargura");
+        shaderProgram.amplitudeUniform = gl.getUniformLocation(shaderProgram, "uAmplitude");
+      }
+      
+      function getShader(gl, id)
+      {
+      	var shaderScript = $(id)[0];
+      	if(!shaderScript) 
+      	{
+      	  return null;
+      	}
+      	
+      	var str = "";
+      	var k = shaderScript.firstChild;
+      	while(k)
+      	{
+      	  if(k.nodeType == 3)
+      	    str += k.textContent;
+      	  k = k.nextSibling;
+      	}
+      	
+      	var shader;
+      	if(shaderScript.type == "x-shader/x-fragment")
+      	{
+      	  shader = gl.createShader(gl.FRAGMENT_SHADER);
+      	}
+      	else if(shaderScript.type == "x-shader/x-vertex")
+      	{
+      	  shader = gl.createShader(gl.VERTEX_SHADER);
+      	}
+      	else
+      	{
+      	  return null;
+      	}
+      	
+      	gl.shaderSource(shader, str);
+      	gl.compileShader(shader);
+      	
+      	if(!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
+      	{
+      	  alert(gl.getShaderInfoLog(shader));
+      	  return null;
+      	}
+      	
+      	return shader;
+      }
+            
+      function iniciarBuffers()
+      {
+        var vertices = Array();
+      	var cores = Array();
+      	var indices = Array();
+      
+      	for(var i = 0; i < numZ; i++)
+      	{
+        	for(var j = 0; j < numX; j++)
+        	{
+        	   vertices.push(i/numX,0.0,-j/numZ);
+        	   //cores.push(1.0, 1.0, 1.0, 1.0);
+        	   cores.push(Math.random(),Math.random(),Math.random(),1.0);
+        	   if(i%2) indices.push((i+1)*numX-(j+1),(i+2)*numX-(j+1));
+        	   else    indices.push(i*numX+j,(i+1)*numX+j);
+        	}
+      	}
+      	
+      	// Vértices
+      	bandeiraVertexPositionBuffer = gl.createBuffer();
+      	gl.bindBuffer(gl.ARRAY_BUFFER, bandeiraVertexPositionBuffer);
+      	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+      	bandeiraVertexPositionBuffer.itemSize = 3;
+      	bandeiraVertexPositionBuffer.numItems = numX * numZ;
+      
+        // Cores
+      	bandeiraVertexColorBuffer = gl.createBuffer();
+      	gl.bindBuffer(gl.ARRAY_BUFFER, bandeiraVertexColorBuffer);
+      	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cores), gl.STATIC_DRAW);
+      	bandeiraVertexColorBuffer.itemSize = 4;
+      	bandeiraVertexColorBuffer.numItems = numX*numZ;
+      	
+      	// Índices
+      	bandeiraVertexIndexBuffer = gl.createBuffer();
+      	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bandeiraVertexIndexBuffer);
+      	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+      	bandeiraVertexIndexBuffer.itemSize = 1;
+      	bandeiraVertexIndexBuffer.numItems = 2*numX*(numZ-1);
+      }
+      
+      function iniciarAmbiente()
+      {
+      	gl.clearColor(0.0, 0.0, 0.0, 1.0);
+      	gl.enable(gl.DEPTH_TEST);
+      }
+      
+      function desenharCena()
+      {
+      	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      	mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
+      	mat4.identity(mMatrix);
+      	mat4.identity(vMatrix);
+      	//mat4.scale(mMatrix, [2.0, 1.0, 2.0]);
+      	
+      	mat4.translate(mMatrix,[-5,-1.0,-7.0]);
+        //mat4.rotate(mMatrix, degToRad(xRot), [0, 1, 0]);
+      	mat4.scale(mMatrix,[10, 1.0, 10]);
+        
+      	
+        
+        
+      	
+      	// Desenhando o Quadrado
+      	gl.bindBuffer(gl.ARRAY_BUFFER, bandeiraVertexPositionBuffer);
+      	gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, bandeiraVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+      	gl.bindBuffer(gl.ARRAY_BUFFER, bandeiraVertexColorBuffer);
+      	gl.vertexAttribPointer(shaderProgram.vertexColorAttribute, bandeiraVertexColorBuffer.itemSize, gl.FLOAT, false, 0, 0);
+      	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bandeiraVertexIndexBuffer);
+      	setMatrixUniforms();
+      	gl.drawElements(gl.TRIANGLE_STRIP, bandeiraVertexIndexBuffer.numItems, gl.UNSIGNED_SHORT,0);
+      }
+      
+      function setMatrixUniforms()
+      {
+        gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
+        gl.uniformMatrix4fv(shaderProgram.vMatrixUniform, false, vMatrix);
+        gl.uniformMatrix4fv(shaderProgram.mMatrixUniform, false, mMatrix);
+        gl.uniform1f(shaderProgram.tempoUniform  , tempo  );
+        gl.uniform1f(shaderProgram.larguraUniform, largura);
+        gl.uniform1f(shaderProgram.amplitudeUniform, amplitude);
+      }
+      
+      // o 'var ultimo = 0' está no topo (todos as vars globais estão juntas)
+      function animar()
+      {
+        var agora = new Date().getTime();
+        if(ultimo != 0)
+        {
+          var diferenca = agora-ultimo;
+          //xRot  += ((xVelo*diferenca)/1000.0) % 360.0;
+          xRot  += ((xVelo*diferenca)/1000.0) % 360.0;
+          tempo += 3*diferenca/1000.0;
+        }
+        ultimo = agora;
+      }
+      
+      function degToRad(graus)
+      {
+        return graus * Math.PI / 180;
+      }
+    </script>
+    
+    <!--Aparência da página (canvas, background...)-->
+    <style>
+      canvas
+      {
+        border:none;
+        width:500px;
+        height:500px;
+      }
+    </style>
+    
+  </head>
+  
+  <body>
+    <canvas id="licao01-canvas" width="500" height="500"></canvas>
+  </body>
+</html>

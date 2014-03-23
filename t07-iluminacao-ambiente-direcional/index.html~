@@ -500,43 +500,43 @@
       
       function setMatrixUniforms()
       {
-      	gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
-      	gl.uniformMatrix4fv(shaderProgram.vMatrixUniform, false, vMatrix);
-      	gl.uniformMatrix4fv(shaderProgram.mMatrixUniform, false, mMatrix);
+	gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
+	gl.uniformMatrix4fv(shaderProgram.vMatrixUniform, false, vMatrix);
+	gl.uniformMatrix4fv(shaderProgram.mMatrixUniform, false, mMatrix);
       }
       
       // o 'var ultimo = 0' está no topo (todos as vars globais estão juntas)
       function animar()
       {
-      	var agora = new Date().getTime();
-      	if(ultimo != 0)
-      	{
-      	  var diferenca = agora-ultimo;
-      	  xRot  += ((xVelo*diferenca)/1000.0) % 360.0;
-      	  yRot  += ((yVelo*diferenca)/1000.0) % 360.0;
-      	}
-      	ultimo = agora;
+	var agora = new Date().getTime();
+	if(ultimo != 0)
+	{
+	  var diferenca = agora-ultimo;
+	  xRot  += ((xVelo*diferenca)/1000.0) % 360.0;
+	  yRot  += ((yVelo*diferenca)/1000.0) % 360.0;
+	}
+	ultimo = agora;
       }
       
       function mPushMatrix()
       {
-        var copy = mat4.create();
-        mat4.set(mMatrix, copy);
-        mMatrixPilha.push(copy);
+	var copy = mat4.create();
+	mat4.set(mMatrix, copy);
+	mMatrixPilha.push(copy);
       }
       
       function mPopMatrix()
       {
-        if(mMatrixPilha.length == 0)
-        {
-          throw "inválido popMatrix!";
-        }
-        mMatrix = mMatrixPilha.pop();
+	if(mMatrixPilha.length == 0)
+	{
+	  throw "inválido popMatrix!";
+	}
+	mMatrix = mMatrixPilha.pop();
       }
       
       function degToRad(graus)
       {
-        return graus * Math.PI / 180;
+	return graus * Math.PI / 180;
       }
     </script>
     
